@@ -1,0 +1,12 @@
+return {
+  _all = {
+    lua = './test/nvim-shim'
+  },
+  unit = {
+    ROOT = {'./test/unit/'},
+  },
+  functional = {
+    ROOT = {'./test/e2e/'},
+    pattern = '',  -- No fancy names for E2E tests
+  },
+}

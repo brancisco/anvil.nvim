@@ -1,0 +1,17 @@
+#!/bin/sh
+
+# Run tests using  eval $(luarocks path --lua-version 5.1 --bin) && busted --run unit
+
+XDG_BASE='test/xdg'
+
+export XDG_CONFIG_HOME="$XDG_BASE/config/"
+export XDG_STATE_HOME="$XDG_BASE/local/state/"
+export XDG_DATA_HOME="$XDG_BASE/local/share/"
+
+mkdir -p "${XDG_DATA_HOME}nvim/site/pack/testing/start/"
+ln -s "$(pwd)" "${XDG_DATA_HOME}nvim/site/pack/testing/start/anything"
+nvim --cmd 'set loadplugins' -l "$@"
+exit_code=$?
+rm -rf "$XDG_BASE"
+
+exit $exit_code
