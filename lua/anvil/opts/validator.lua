@@ -27,18 +27,25 @@ local function test_table(path, value, tbl)
     error(('Config at "%s" must contain at least a type.'):format(path))
   end
   local _type = tbl[1]
-  local clean_type, _ = common.parse_type_string(_type)
-  if type(_type) ~= 'string' or M.ValidTypes[clean_type] == nil then
+  if type(_type) ~= 'string' then
     error(('First value of config ("%s") must be a valid lua type.'):format(_type))
   end
-  local pass, errors = common.test_type(path, value, _type)
+
+  local clean_types, _ = common.parse_type_string(_type)
+  for _, t in ipairs(clean_types) do
+    if M.ValidTypes[t] == nil then
+      error(('Type "%s" in union type string "%s" is not a valid lua type.'):format(t, _type))
+    end
+  end
+
+  local pass, errors, matched_type = common.test_type(path, value, _type)
   if not pass then
     return false, errors
   end
-  if rules.test_with_args[clean_type] ~= nil then
-    local pass, errors = rules.test_with_args[clean_type](value, tbl)
-    if not pass then
-      return false, errors
+  if matched_type and rules.test_with_args[matched_type] ~= nil then
+    local pass_rules, errors_rules = rules.test_with_args[matched_type](value, tbl)
+    if not pass_rules then
+      return false, errors_rules
     end
   end
   return true, nil

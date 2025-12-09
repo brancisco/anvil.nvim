@@ -250,4 +250,71 @@ describe('The validate function', function()
     assert.is_not._nil(errors)
     assert.are.same(errors[1], 'Value "123" at "foo.bar" is not of type "boolean"')
   end)
+
+  it('passes with a union type and a matching number', function()
+    local validator = { ['foo.bar'] = 'string|number' }
+    local test = { foo = { bar = 123 } }
+    local _, errors = validate(validator, test)
+    assert.is._nil(errors)
+  end)
+
+  it('passes with a union type and a matching string', function()
+    local validator = { ['foo.bar'] = 'string|number' }
+    local test = { foo = { bar = 'hello' } }
+    local _, errors = validate(validator, test)
+    assert.is._nil(errors)
+  end)
+
+  it('fails with a union type and a non-matching type', function()
+    local validator = { ['foo.bar'] = 'string|number' }
+    local test = { foo = { bar = true } }
+    local _, errors = validate(validator, test)
+    assert.is_not._nil(errors)
+    assert.are.same(errors[1], 'Value "true" at "foo.bar" is not one of type [string or number]')
+  end)
+
+  it('passes with an optional union type and a nil value', function()
+    local validator = { ['foo.bar'] = 'string|number?' }
+    local test = { foo = {} }
+    local _, errors = validate(validator, test)
+    assert.is._nil(errors)
+  end)
+
+  it('fails with a required union type and a nil value', function()
+    local validator = { ['foo.bar'] = 'string|number!' }
+    local test = { foo = {} }
+    local _, errors = validate(validator, test)
+    assert.is_not._nil(errors)
+    assert.are.same(errors[1], 'Value at "foo.bar" is required.')
+  end)
+
+  it('passes with a union type and a matching rule for string', function()
+    local validator = { ['foo.bar'] = { 'string|number', lt = 4 } }
+    local test = { foo = { bar = 'hi' } }
+    local _, errors = validate(validator, test)
+    assert.is._nil(errors)
+  end)
+
+  it('passes with a union type and a matching rule for number', function()
+    local validator = { ['foo.bar'] = { 'string|number', lt = 4 } }
+    local test = { foo = { bar = 3 } }
+    local _, errors = validate(validator, test)
+    assert.is._nil(errors)
+  end)
+
+  it('fails with a union type and a non-matching rule for string', function()
+    local validator = { ['foo.bar'] = { 'string|number', lt = 4 } }
+    local test = { foo = { bar = 'hello' } }
+    local _, errors = validate(validator, test)
+    assert.is_not._nil(errors)
+    assert.are.same(errors[1], 'String must be less than 4 characters.')
+  end)
+
+  it('fails with a union type and a non-matching rule for number', function()
+    local validator = { ['foo.bar'] = { 'string|number', lt = 4 } }
+    local test = { foo = { bar = 5 } }
+    local _, errors = validate(validator, test)
+    assert.is_not._nil(errors)
+    assert.are.same(errors[1], 'Number must be less than 4.')
+  end)
 end)
