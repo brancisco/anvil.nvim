@@ -1,5 +1,6 @@
 ---@module 'anvil.opts.rules'
 local M = {}
+local common = require('anvil.opts.common')
 
 --- A table containing functions for validating specific types with additional arguments.
 ---@field number fun(value: number, args: {lt?: number, gt?: number}):(boolean, string[]|nil) Validates a number against `lt` and `gt` constraints.
@@ -119,10 +120,59 @@ M.test_with_args = {
     return true, nil
   end,
   table = function(value, args)
-    -- Maybe add other validation options here.
+    local all_errors = {}
+    if args.repeated then
+      if type(args.repeated) ~= 'boolean' then
+        error('Argument "repeated" must be a boolean.')
+      end
+      if type(value) ~= 'table' then
+        return false, { 'Value is not a table.' }
+      end
+      for i = 1, table.maxn(value) do
+        local item = value[i]
+        local path = ('[%d]'):format(i)
+        if args.type then
+          if type(args.type) ~= 'string' then
+            error('Argument "type" must be a string.')
+          end
+          local pass, errors = common.test_type(path, item, args.type)
+          if not pass then
+            for _, err in ipairs(errors) do
+              table.insert(all_errors, err)
+            end
+          end
+        end
+
+        if args.shape then
+          if type(args.shape) ~= 'table' then
+            error('Argument "shape" must be a table.')
+          end
+          local validator = require('anvil.opts.validator')
+          local _, errors = validator.validate(args.shape, item)
+          if errors then
+            for _, err in ipairs(errors) do
+              table.insert(all_errors, ('at index %d: %s'):format(i, err))
+            end
+          end
+        end
+      end
+    elseif args.shape then
+      if type(args.shape) ~= 'table' then
+        error('Argument "shape" must be a table.')
+      end
+      local validator = require('anvil.opts.validator')
+      local _, errors = validator.validate(args.shape, value)
+      if errors then
+        return false, errors
+      end
+    end
+
+    if #all_errors > 0 then
+      return false, all_errors
+    end
+
     return true, nil
   end,
 }
 
 return M
-

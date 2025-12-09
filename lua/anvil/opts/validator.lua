@@ -3,50 +3,7 @@ local M = {}
 
 local tbl_utils = require('anvil.utils.table')
 local rules = require('anvil.opts.rules')
-
----@private
---- Parses a type string to extract the base type and requirement.
----@param type_str string The type string to parse (e.g., 'string', 'string!', 'string?').
----@return string, boolean The clean type name and a boolean indicating if it's required.
-local function parse_type_string(type_str)
-  local required = true
-  local clean_type = type_str
-  local last_char = string.sub(type_str, -1)
-
-  if last_char == '?' then
-    required = false
-    clean_type = string.sub(type_str, 1, -2)
-  elseif last_char == '!' then
-    required = true
-    clean_type = string.sub(type_str, 1, -2)
-  end
-
-  return clean_type, required
-end
-
----@private
---- Tests the type of a value.
----@param path string The path of the value being tested.
----@param value any The value to test.
----@param _type string The expected type of the value.
----@return boolean, string[]|{} A boolean indicating if the test passed, and a table of errors.
-local function test_type(path, value, _type)
-  local clean_type, required = parse_type_string(_type)
-
-  if value == nil then
-    if required then
-      return false, { ('Value at "%s" is required.'):format(path) }
-    else
-      return true, {}
-    end
-  end
-
-  if type(value) ~= clean_type then
-    local msg = ('Value "%s" at "%s" is not of type "%s"'):format(tostring(value), path, clean_type)
-    return false, { msg }
-  end
-  return true, {}
-end
+local common = require('anvil.opts.common')
 
 --- A table of valid types.
 ---@type table<string, number>
@@ -70,11 +27,11 @@ local function test_table(path, value, tbl)
     error(('Config at "%s" must contain at least a type.'):format(path))
   end
   local _type = tbl[1]
-  local clean_type, _ = parse_type_string(_type)
+  local clean_type, _ = common.parse_type_string(_type)
   if type(_type) ~= 'string' or M.ValidTypes[clean_type] == nil then
     error(('First value of config ("%s") must be a valid lua type.'):format(_type))
   end
-  local pass, errors = test_type(path, value, _type)
+  local pass, errors = common.test_type(path, value, _type)
   if not pass then
     return false, errors
   end
@@ -95,7 +52,7 @@ end
 ---@return boolean, string[]|{}|nil A boolean indicating if the test passed, and a table of errors.
 local function test(path, value, config)
   if type(config) == 'string' then
-    return test_type(path, value, config)
+    return common.test_type(path, value, config)
   elseif type(config) == 'table' then
     return test_table(path, value, config)
   else
@@ -110,8 +67,11 @@ end
 function M.validate(format, opts)
   local result = {}
   local all_errors = {}
-  for path, config in pairs(format) do
-    local value = tbl_utils.get_path(opts, path)
+
+  -- 1. Handle array part for ordered validation
+  for i, config in ipairs(format) do
+    local value = opts[i]
+    local path = ('[%d]'):format(i) -- Create a path for error messages
     local pass, test_errors = test(path, value, config)
     if not pass then
       for _, err_msg in ipairs(test_errors) do
@@ -119,6 +79,20 @@ function M.validate(format, opts)
       end
     end
   end
+
+  -- 2. Handle hash part for key-path validation
+  for path, config in pairs(format) do
+    if type(path) == 'string' then -- Process only string keys
+      local value = tbl_utils.get_path(opts, path)
+      local pass, test_errors = test(path, value, config)
+      if not pass then
+        for _, err_msg in ipairs(test_errors) do
+          table.insert(all_errors, err_msg)
+        end
+      end
+    end
+  end
+
   if #all_errors > 0 then
     return result, all_errors
   else
